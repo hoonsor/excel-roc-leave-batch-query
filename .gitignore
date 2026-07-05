@@ -14,3 +14,11 @@ Desktop.ini
 # App Data or User Config
 .env
 .gemini/
+
+# Test data & Copies
+差假紀錄查詢_*.xls
+* - 複製.xlsm
+* - Copy.xlsm
+* - Copy.xlsx
+* - 複製.xlsx
+
