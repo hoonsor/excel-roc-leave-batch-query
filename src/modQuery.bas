@@ -133,7 +133,7 @@ Public Sub RunBatchQuery()
         dtBase = modUtility.CDateFromROC(qDateStr)
         If Err.Number <> 0 Then
             queryValid = False
-            errMsg = "日期格式錯誤 (須7碼)"
+            errMsg = "日期錯誤: " & Err.Description
             Err.Clear
             On Error GoTo ErrorHandler
             GoTo WriteResult

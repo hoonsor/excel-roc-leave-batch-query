@@ -41,15 +41,19 @@ Public Function CDateFromROC(ByVal strRocDate As String) As Date
     
     Dim intYear As Integer, intMonth As Integer, intDay As Integer
     Dim parts() As String
+    Dim hasSeparator As Boolean
+    hasSeparator = False
     
     ' 2. 判斷是否帶有分隔符
     If InStr(strClean, "/") > 0 Then
         parts = Split(strClean, "/")
+        hasSeparator = True
     ElseIf InStr(strClean, "-") > 0 Then
         parts = Split(strClean, "-")
+        hasSeparator = True
     End If
     
-    If IsArrayInitialized(parts) Then
+    If hasSeparator Then
         If UBound(parts) = 2 Then
             intYear = CInt(parts(0))
             intMonth = CInt(parts(1))
@@ -88,7 +92,7 @@ Public Function CDateFromROC(ByVal strRocDate As String) As Date
     Exit Function
 
 ErrorHandler:
-    Err.Raise Err.Number, "modUtility.CDateFromROC", "民國日期「" & strRocDate & "」轉換失敗: " & Err.Description
+    Err.Raise Err.Number, "modUtility.CDateFromROC", Err.Description
 End Function
 
 ''' <summary>
@@ -134,7 +138,7 @@ Public Function ParseRocDateTime(ByVal strRocDateTime As String) As Date
     Exit Function
 
 ErrorHandler:
-    Err.Raise Err.Number, "modUtility.ParseRocDateTime", "民國日期時間「" & strRocDateTime & "」轉換失敗: " & Err.Description
+    Err.Raise Err.Number, "modUtility.ParseRocDateTime", Err.Description
 End Function
 
 ''' <summary>
@@ -164,17 +168,6 @@ Public Function FormatROC(ByVal dtDate As Date, Optional ByVal strFormat As Stri
 End Function
 
 ' --- 內部輔助函式 ---
-
-Private Function IsArrayInitialized(ByRef arr() As String) As Boolean
-    On Error Resume Next
-    Dim lBoundCheck As Long
-    lBoundCheck = LBound(arr)
-    If Err.Number = 0 Then
-        IsArrayInitialized = True
-    Else
-        IsArrayInitialized = False
-    End If
-End Function
 
 Private Function GetDaysInMonth(ByVal intRocYear As Integer, ByVal intMonth As Integer) As Integer
     Select Case intMonth
