@@ -181,29 +181,24 @@ def build_excel_tool():
         btn_clear.Font.Name = "微軟正黑體"
         btn_clear.Font.Bold = True
         
-        # 6. 寫入測試查詢資料 (供驗證用)
-        # 測試資料 1: 李修銘 (115-02-10 08:00 ~ 17:00 休假)
-        # 測試資料 2: 李修銘 (無重疊時間)
-        # 測試資料 3: 許夆池 (115-03-17 16:00 ~ 23:00 出差)
-        # 測試資料 4: 林家繽 (115-03-16 13:00 ~ 17:00 出差)
-        test_queries = [
-            ["1", "李修銘", "1150210", "0800", "0900"],  # 有請假 (重疊)
-            ["2", "李修銘", "1150210", "1700", "1800"],  # 無請假 (相切)
-            ["3", "許夆池", "1150317", "1800", "2000"],  # 有請假 (重疊)
-            ["4", "林家繽", "1150316", "1200", "1400"],  # 有請假 (重疊)
-            ["5", "許振武", "1150130", "0800", "1200"],  # 有請假 (跨天 1/30-2/1 重疊)
-            ["6", "呂慧瑶", "1150305", "1600", "1700"],  # 有請假 (重疊)
-            ["7", "無名氏", "1150210", "0800", "0900"]   # 無請假 (不在資料庫中)
+        # 6. 查詢介面留空（去識別化：不填入任何預設人名，使活頁簿保持乾淨）
+        # 僅填入示範性的空白序號列，供使用者參考欄位格式
+        placeholder_rows = [
+            ["1", "", "", "", ""],
+            ["2", "", "", "", ""],
+            ["3", "", "", "", ""],
+            ["4", "", "", "", ""],
+            ["5", "", "", "", ""],
         ]
-        
-        for r_idx, row_data in enumerate(test_queries, start=5):
+        for r_idx, row_data in enumerate(placeholder_rows, start=5):
             for c_idx, val in enumerate(row_data, start=1):
                 ws_query.Cells(r_idx, c_idx).Value = val
-                
+
         # 7. 儲存為巨集活頁簿 (.xlsm)
         # 52 = xlOpenXMLWorkbookMacroEnabled
         wb.SaveAs(dest_path, FileFormat=52)
         print(f"Workbook saved successfully at {dest_path}")
+
         
         # 8. 開始自動化測試與驗證
         print("--- Running Automated Verification ---")
@@ -222,6 +217,20 @@ def build_excel_tool():
         wb_source.Close(False)
         print("Loaded leave records into database sheet.")
         
+        # 暫時填入測試用查詢資料（僅用於自動化驗證，驗證後立即清除）
+        test_queries = [
+            ["1", "李修銘", "1150210", "0800", "0900"],  # 有請假 (重疊)
+            ["2", "李修銘", "1150210", "1700", "1800"],  # 無請假 (相切)
+            ["3", "許夆池", "1150317", "1800", "2000"],  # 有請假 (重疊)
+            ["4", "林家繽", "1150316", "1200", "1400"],  # 有請假 (重疊)
+            ["5", "許振武", "1150130", "0800", "1200"],  # 有請假 (跨天 1/30-2/1 重疊)
+            ["6", "呂慧瑶", "1150305", "1600", "1700"],  # 有請假 (重疊)
+            ["7", "無名氏", "1150210", "0800", "0900"]   # 無請假 (不在資料庫中)
+        ]
+        for r_idx, row_data in enumerate(test_queries, start=5):
+            for c_idx, val in enumerate(row_data, start=1):
+                ws_query.Cells(r_idx, c_idx).Value = val
+        
         # 執行大批查詢巨集
         print("Running batch query macro (RunBatchQuery)...")
         excel.Run("RunBatchQuery")
@@ -238,16 +247,43 @@ def build_excel_tool():
             print(f"Name: {name} | Result: {status} | Detail: {detail[:60] if detail else ''}")
             
         # 斷言驗證
-        assert results[0][1] == "有請假", "Test Case 1 failed: 李修銘 1150210 0800-0900 should be '有請假'"
-        assert results[1][1] == "無請假", "Test Case 2 failed: 李修銘 1150210 1700-1800 should be '無請假'"
-        assert results[2][1] == "有請假", "Test Case 3 failed: 許夆池 1150317 1800-2000 should be '有請假'"
-        assert results[3][1] == "有請假", "Test Case 4 failed: 林家繽 1150316 1200-1400 should be '有請假'"
-        assert results[4][1] == "有請假", "Test Case 5 failed: 許振武 1150130 0800-1200 should be '有請假'"
+        assert results[0][1] == "有請假", "Test Case 1 failed: TC1 1150210 0800-0900 should be '有請假'"
+        assert results[1][1] == "無請假", "Test Case 2 failed: TC1 1150210 1700-1800 should be '無請假'"
+        assert results[2][1] == "有請假", "Test Case 3 failed: TC3 1150317 1800-2000 should be '有請假'"
+        assert results[3][1] == "有請假", "Test Case 4 failed: TC4 1150316 1200-1400 should be '有請假'"
+        assert results[4][1] == "有請假", "Test Case 5 failed: TC5 1150130 0800-1200 should be '有請假'"
         
         print("\nAll automated integration tests PASSED successfully!")
         
-        # 儲存最終狀態
+        # ✅ 驗證完成後，清除查詢介面（去識別化：還原為空白乾淨狀態）
+        print("Clearing query interface for clean delivery (de-identification)...")
+        last_row = 5 + len(test_queries) - 1
+        ws_query.Range(f"A5:G{last_row}").ClearContents()
+        ws_query.Range(f"A5:G{last_row}").Interior.ColorIndex = -4142  # xlNone
+        ws_query.Range(f"A5:G{last_row}").Font.ColorIndex = -4105       # xlAutomatic
+        # 還原差假資料庫的篩選與著色
+        if ws_db.AutoFilterMode:
+            ws_db.AutoFilterMode = False
+        ws_db.Range("A2:L2461").Interior.ColorIndex = -4142
+        ws_db.Range("A2:L2461").Font.ColorIndex = -4105
+        # 清空差假資料庫（正式交付版本不含測試假單資料）
+        ws_db.Range("A2:L2461").ClearContents()
+        # 僅填入序號（供使用者查看欄位格式用）
+        placeholder_rows = [
+            ["1", "", "", "", ""],
+            ["2", "", "", "", ""],
+            ["3", "", "", "", ""],
+            ["4", "", "", "", ""],
+            ["5", "", "", "", ""],
+        ]
+        for r_idx, row_data in enumerate(placeholder_rows, start=5):
+            for c_idx, val in enumerate(row_data, start=1):
+                ws_query.Cells(r_idx, c_idx).Value = val
+        print("Query interface cleared. Workbook is clean and de-identified.")
+        
+        # 儲存最終乾淨狀態
         wb.Save()
+
         
     except Exception as e:
         print("Error during build and test:", e)
