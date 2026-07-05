@@ -23,6 +23,25 @@ def build_excel_tool():
     dest_path = os.path.join(workspace_dir, "差假大批查詢工具.xlsm")
     raw_xls_path = os.path.join(workspace_dir, "差假紀錄查詢_2026-07-05-09-50-38.xls")
     
+    # 嘗試刪除舊檔以檢測鎖定
+    if os.path.exists(dest_path):
+        try:
+            os.remove(dest_path)
+            print("Successfully deleted old workbook to prepare for overwrite.")
+        except PermissionError:
+            print("Workbook is locked by Excel. Terminating excel.exe processes...")
+            import subprocess
+            import time
+            subprocess.call("taskkill /f /im excel.exe", shell=True)
+            time.sleep(1) # 等待一秒釋放
+            try:
+                os.remove(dest_path)
+                print("Successfully deleted old workbook after terminating Excel.")
+            except Exception as ex:
+                print("Warning: Still unable to delete old workbook:", ex)
+        except Exception as e:
+            print("Warning: Error checking/deleting old workbook:", e)
+        
     # 啟動 Excel
     excel = win32com.client.Dispatch("Excel.Application")
     excel.Visible = False  # 背景運行
