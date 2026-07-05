@@ -65,15 +65,39 @@ def build_excel_tool():
             ws_db.Cells(1, col_idx).Value = h
             ws_db.Cells(1, col_idx).Font.Bold = True
             
-        # 3. 匯入 VBA 程式碼
+        # 3. 匯入 VBA 程式碼 (轉為 CP950 臨時檔再匯入，確保 VBE 不亂碼)
+        temp_vba_dir = os.path.join(workspace_dir, "scratch", "temp_cp950")
+        os.makedirs(temp_vba_dir, exist_ok=True)
+        
         vba_modules = ["clsLeaveRecord.cls", "modUtility.bas", "modImport.bas", "modQuery.bas"]
         for vba_mod in vba_modules:
-            vba_path = os.path.join(src_dir, vba_mod)
-            if os.path.exists(vba_path):
-                print(f"Importing VBA module: {vba_mod} ...")
-                wb.VBProject.VBComponents.Import(vba_path)
+            utf8_path = os.path.join(src_dir, vba_mod)
+            temp_cp950_path = os.path.join(temp_vba_dir, vba_mod)
+            
+            if os.path.exists(utf8_path):
+                # 讀取無損的 UTF-8 原始檔
+                with open(utf8_path, 'r', encoding='utf-8') as f_in:
+                    code_content = f_in.read()
+                # 寫入 VBE 所需的 CP950
+                with open(temp_cp950_path, 'w', encoding='cp950', errors='replace') as f_out:
+                    f_out.write(code_content)
+                    
+                print(f"Importing VBA module: {vba_mod} (as CP950)...")
+                wb.VBProject.VBComponents.Import(temp_cp950_path)
+                
+                # 刪除臨時檔
+                try:
+                    os.remove(temp_cp950_path)
+                except Exception:
+                    pass
             else:
-                raise FileNotFoundError(f"VBA module not found: {vba_path}")
+                raise FileNotFoundError(f"VBA module not found: {utf8_path}")
+                
+        # 移除臨時目錄
+        try:
+            os.rmdir(temp_vba_dir)
+        except Exception:
+            pass
                 
         # 4. 美化「查詢介面」工作表
         print("Styling Query Interface...")
