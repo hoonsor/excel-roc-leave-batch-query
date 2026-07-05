@@ -1,0 +1,16 @@
+# Excel Temporary Files
+~$*.xlsx
+~$*.xlsm
+~$*.xls
+~$*.xltm
+
+# VBA Export files
+*.frx
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+
+# App Data or User Config
+.env
+.gemini/
