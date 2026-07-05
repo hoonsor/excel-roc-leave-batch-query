@@ -16,3 +16,4 @@ Public Reason As String
 Public Status As String
 Public RawStart As String
 Public RawEnd As String
+Public DbRow As Long

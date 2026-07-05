@@ -35,12 +35,23 @@ Public Sub RunBatchQuery()
     Application.Calculation = xlCalculationManual
     Application.EnableEvents = False
     
-    ' 3. 將差假資料庫載入到記憶體中並建立字典索引 (以姓名為 Key)
-    Dim dictDb As Object
-    Set dictDb = CreateObject("Scripting.Dictionary")
-    
+    ' 3. 取得資料庫列數，並在查詢前「清除舊有的著色標記與篩選」
     Dim lastRowDb As Long
     lastRowDb = wsDb.Cells(wsDb.Rows.Count, 1).End(xlUp).Row
+    
+    ' 清除篩選 (還原完整資料庫視圖)
+    If wsDb.FilterMode Then wsDb.ShowAllData
+    If wsDb.AutoFilterMode Then wsDb.AutoFilterMode = False
+    
+    ' 清除前一次標記的背景色與字型顏色
+    If lastRowDb >= 2 Then
+        wsDb.Range("A2:L" & lastRowDb).Interior.ColorIndex = xlNone
+        wsDb.Range("A2:L" & lastRowDb).Font.ColorIndex = xlAutomatic
+    End If
+    
+    ' 4. 將差假資料庫載入到記憶體中並建立字典索引 (以姓名為 Key)
+    Dim dictDb As Object
+    Set dictDb = CreateObject("Scripting.Dictionary")
     
     If lastRowDb >= 2 Then
         Dim arrDb() As Variant
@@ -66,6 +77,7 @@ Public Sub RunBatchQuery()
                     rec.RawStart = CStr(arrDb(rDb, 5))  ' 開始日期 (第 5 欄)
                     rec.RawEnd = CStr(arrDb(rDb, 6))    ' 結束日期 (第 6 欄)
                     rec.Reason = CStr(arrDb(rDb, 8))    ' 事由 (第 8 欄)
+                    rec.DbRow = rDb + 1                 ' 紀錄對應 Excel 工作表的真實行號
                     
                     ' 解析日期時間為西元 Date
                     On Error Resume Next
@@ -86,17 +98,19 @@ Public Sub RunBatchQuery()
         Next rDb
     End If
     
-    ' 4. 清除先前的查詢結果與格式
+    ' 5. 清除查詢介面先前的結果與格式
     wsQuery.Range("F5:G" & lastRowQuery).ClearContents
     wsQuery.Range("A5:G" & lastRowQuery).Interior.ColorIndex = xlNone
     wsQuery.Range("A5:G" & lastRowQuery).Font.ColorIndex = xlAutomatic
     
-    ' 5. 開始逐列查詢比對
+    ' 6. 開始逐列查詢比對
     Dim rQuery As Long
     Dim qName As String, qDateStr As String, qStartStr As String, qEndStr As String
     Dim qStartDT As Date, qEndDT As Date
     Dim queryValid As Boolean
     Dim errMsg As String
+    Dim anyMatch As Boolean
+    anyMatch = False ' 用以記錄是否有任一筆匹配成功
     
     For rQuery = 5 To lastRowQuery
         queryValid = True
@@ -176,7 +190,7 @@ WriteResult:
             GoTo NextQuery
         End If
         
-        ' 6. 核心比對邏輯 (使用 Dictionary + Collection 進行比對)
+        ' 7. 核心比對與著色標記邏輯
         Dim hasLeave As Boolean
         Dim leaveDetails As String
         hasLeave = False
@@ -194,7 +208,9 @@ WriteResult:
                 ' 條件：S_query < E_leave 且 E_query > S_leave
                 If qStartDT < lRec.EndDT And qEndDT > lRec.StartDT Then
                     hasLeave = True
-                    ' 組合顯示資訊： 假別 (開始時間 ~ 結束時間) 事由
+                    anyMatch = True
+                    
+                    ' 1) 組合顯示資訊： 假別 (開始時間 ~ 結束時間) 事由
                     Dim strPeriod As String
                     strPeriod = lRec.LeaveType & " (" & lRec.RawStart & " ~ " & lRec.RawEnd & ")"
                     If Trim(lRec.Reason) <> "" Then
@@ -206,27 +222,37 @@ WriteResult:
                     Else
                         leaveDetails = leaveDetails & vbCrLf & strPeriod
                     End If
+                    
+                    ' 2) 人性化回饋：同步在「差假資料庫」對應的原始 row 上標註顏色
+                    wsDb.Range("A" & lRec.DbRow & ":L" & lRec.DbRow).Interior.Color = RGB(253, 233, 230) ' 淡紅色
+                    wsDb.Range("A" & lRec.DbRow & ":L" & lRec.DbRow).Font.Color = RGB(220, 20, 60)         ' 紅色
                 End If
             Next item
         End If
         
-        ' 寫回結果並美化著色
+        ' 寫回查詢結果並美化著色
         If hasLeave Then
             wsQuery.Cells(rQuery, COL_RESULT).Value = "有請假"
             wsQuery.Cells(rQuery, COL_DETAIL).Value = leaveDetails
             ' 淡紅色背景，紅色文字 (著色整列查詢資料)
             wsQuery.Range(wsQuery.Cells(rQuery, 1), wsQuery.Cells(rQuery, COL_DETAIL)).Interior.Color = RGB(253, 233, 230)
             wsQuery.Range(wsQuery.Cells(rQuery, 1), wsQuery.Cells(rQuery, COL_DETAIL)).Font.Color = RGB(220, 20, 60)
-        Else
+        else
             wsQuery.Cells(rQuery, COL_RESULT).Value = "無請假"
-            ' 綠色調美化
+            ' 綠色調字體
             wsQuery.Range(wsQuery.Cells(rQuery, COL_RESULT), wsQuery.Cells(rQuery, COL_RESULT)).Font.Color = RGB(34, 139, 34)
         End If
         
 NextQuery:
     Next rQuery
     
-    ' 7. 效能優化結束與恢復
+    ' 8. 人性化功能：若有匹配項目，在「差假資料庫」啟用背景色篩選
+    If anyMatch And lastRowDb >= 2 Then
+        ' Field 1 = 第 1 欄 (單位)。根據淡紅色背景色篩選，只顯示有命中的行
+        wsDb.Range("A1:L" & lastRowDb).AutoFilter Field:=1, Criteria1:=RGB(253, 233, 230), Operator:=xlFilterCellColor
+    End If
+    
+    ' 9. 效能優化結束與恢復
     Application.ScreenUpdating = True
     Application.Calculation = xlCalculationAutomatic
     Application.EnableEvents = True
@@ -243,11 +269,14 @@ ErrorHandler:
 End Sub
 
 ''' <summary>
-''' 清除查詢介面的輸入與結果
+''' 清除查詢介面的輸入與結果，並同步恢復「差假資料庫」的著色與篩選
 ''' </summary>
 Public Sub ClearQueryData()
     Dim wsQuery As Worksheet
+    Dim wsDb As Worksheet
+    
     Set wsQuery = ThisWorkbook.Sheets("查詢介面")
+    Set wsDb = ThisWorkbook.Sheets("差假資料庫")
     
     Dim lastRowQuery As Long
     lastRowQuery = wsQuery.Cells(wsQuery.Rows.Count, COL_NAME).End(xlUp).Row
@@ -255,14 +284,27 @@ Public Sub ClearQueryData()
     If lastRowQuery >= 5 Then
         ' 彈出確認對話框
         Dim ans As VbMsgBoxResult
-        ans = MsgBox("您確定要清除所有的查詢輸入與結果嗎？", vbQuestion + vbYesNo, "確認清除")
+        ans = MsgBox("您確定要清除所有的查詢輸入與結果嗎？" & vbCrLf & "（這將同時復原「差假資料庫」的著色與篩選）", vbQuestion + vbYesNo, "確認清除")
         If ans = vbNo Then Exit Sub
         
         Application.ScreenUpdating = False
-        ' 清除 B5 到 G最後一列
+        
+        ' 1. 清除查詢介面
         wsQuery.Range("B5:G" & lastRowQuery).ClearContents
         wsQuery.Range("A5:G" & lastRowQuery).Interior.ColorIndex = xlNone
         wsQuery.Range("A5:G" & lastRowQuery).Font.ColorIndex = xlAutomatic
+        
+        ' 2. 恢復「差假資料庫」的視圖與著色 (保留資料，僅清除標註與篩選)
+        If wsDb.FilterMode Then wsDb.ShowAllData
+        If wsDb.AutoFilterMode Then wsDb.AutoFilterMode = False
+        
+        Dim lastRowDb As Long
+        lastRowDb = wsDb.Cells(wsDb.Rows.Count, 1).End(xlUp).Row
+        If lastRowDb >= 2 Then
+            wsDb.Range("A2:L" & lastRowDb).Interior.ColorIndex = xlNone
+            wsDb.Range("A2:L" & lastRowDb).Font.ColorIndex = xlAutomatic
+        End If
+        
         Application.ScreenUpdating = True
     End If
 End Sub
