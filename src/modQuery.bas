@@ -10,17 +10,6 @@ Private Const COL_TEND As Integer = 5     ' 欄位 E: 結束時間
 Private Const COL_RESULT As Integer = 6   ' 欄位 F: 查詢結果
 Private Const COL_DETAIL As Integer = 7   ' 欄位 G: 請假明細
 
-' 請假資料記錄的自訂型別
-Private Type LeaveRecord
-    LeaveType As String
-    StartDT As Date
-    EndDT As Date
-    Reason As String
-    Status As String
-    RawStart As String
-    RawEnd As String
-End Type
-
 ''' <summary>
 ''' 執行大批請假查詢
 ''' </summary>
@@ -59,15 +48,20 @@ Public Sub RunBatchQuery()
         
         Dim rDb As Long
         Dim empName As String
-        Dim rec As LeaveRecord
+        Dim rec As clsLeaveRecord
         Dim colLeaves As Collection
         
         For rDb = 1 To UBound(arrDb, 1)
             empName = Trim(CStr(arrDb(rDb, 3))) ' 姓名 (第 3 欄)
             If empName <> "" Then
                 ' 只載入「已簽核」或「審核完成」的假單，過濾未簽核的
-                rec.Status = Trim(CStr(arrDb(rDb, 12))) ' 審核狀況 (第 12 欄)
-                If rec.Status = "已簽核" Or rec.Status = "審核完成" Or rec.Status = "" Then
+                Dim strStatus As String
+                strStatus = Trim(CStr(arrDb(rDb, 12))) ' 審核狀況 (第 12 欄)
+                
+                If strStatus = "已簽核" Or strStatus = "審核完成" Or strStatus = "" Then
+                    ' 實例化類別物件
+                    Set rec = New clsLeaveRecord
+                    rec.Status = strStatus
                     rec.LeaveType = CStr(arrDb(rDb, 4)) ' 假別 (第 4 欄)
                     rec.RawStart = CStr(arrDb(rDb, 5))  ' 開始日期 (第 5 欄)
                     rec.RawEnd = CStr(arrDb(rDb, 6))    ' 結束日期 (第 6 欄)
@@ -191,10 +185,10 @@ WriteResult:
         If dictDb.Exists(qName) Then
             Set colLeaves = dictDb(qName)
             Dim item As Variant
-            Dim lRec As LeaveRecord
+            Dim lRec As clsLeaveRecord
             
             For Each item In colLeaves
-                lRec = item
+                Set lRec = item
                 
                 ' 重疊演算法：[S_query, E_query] 與 [S_leave, E_leave] 重疊
                 ' 條件：S_query < E_leave 且 E_query > S_leave
@@ -225,7 +219,7 @@ WriteResult:
             wsQuery.Range(wsQuery.Cells(rQuery, 1), wsQuery.Cells(rQuery, COL_DETAIL)).Font.Color = RGB(220, 20, 60)
         Else
             wsQuery.Cells(rQuery, COL_RESULT).Value = "無請假"
-            ' 綠色調美化 (可選，無請假就不特別變更背景或使用超淡綠色)
+            ' 綠色調美化
             wsQuery.Range(wsQuery.Cells(rQuery, COL_RESULT), wsQuery.Cells(rQuery, COL_RESULT)).Font.Color = RGB(34, 139, 34)
         End If
         

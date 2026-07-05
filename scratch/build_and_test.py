@@ -66,7 +66,7 @@ def build_excel_tool():
             ws_db.Cells(1, col_idx).Font.Bold = True
             
         # 3. 匯入 VBA 程式碼
-        vba_modules = ["modUtility.bas", "modImport.bas", "modQuery.bas"]
+        vba_modules = ["clsLeaveRecord.cls", "modUtility.bas", "modImport.bas", "modQuery.bas"]
         for vba_mod in vba_modules:
             vba_path = os.path.join(src_dir, vba_mod)
             if os.path.exists(vba_path):

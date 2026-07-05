@@ -4,7 +4,7 @@ def convert_to_cp950():
     workspace_dir = r"d:\北科附工\015-Antigravity工作資料夾\03-Antigravity協助撰寫巨集"
     src_dir = os.path.join(workspace_dir, "src")
     
-    vba_files = ["modUtility.bas", "modImport.bas", "modQuery.bas"]
+    vba_files = ["clsLeaveRecord.cls", "modUtility.bas", "modImport.bas", "modQuery.bas"]
     
     for filename in vba_files:
         filepath = os.path.join(src_dir, filename)
