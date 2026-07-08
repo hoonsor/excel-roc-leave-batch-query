@@ -6,7 +6,7 @@
 
 ## 📊 專案基本資訊
 *   **專案名稱**：Excel 巨集與民國曆日期計算工具箱
-*   **當前版本**：`v1.1.0`
+*   **當前版本**：`v1.1.1`
 *   **開發狀態**：已完成全部開發與自動化整合測試 (Completed & Verified)
 *   **負責人**：Antigravity (Excel 巨集大師 & 民國曆日期計算專家)
 *   **GitHub 遠端倉庫**：[excel-roc-leave-batch-query](https://github.com/hoonsor/excel-roc-leave-batch-query)
@@ -43,6 +43,7 @@
 
 | 版本 | 日期 | 異動內容 | 負責人 |
 | :--- | :--- | :--- | :--- |
+| `v1.1.1` | 2026-07-08 | 讀取李美娟老師的職場巡輔 PDF，正確抓出其 13 個民國 115 年星期二的巡輔日期，並以 26 筆（上下午拆分）資料形式寫入測試 Excel 的查詢介面。 | Antigravity |
 | `v1.1.0` | 2026-07-05 | 實作差假資料庫同步著色、AutoFilter 顏色自動篩選與無損復原清除機制，並執行 GitHub 初始化建庫與首次推送。 | Antigravity |
 | `v1.0.0` | 2026-07-05 | 完成 VBA 原始碼開發、巨集活頁簿美化與整合測試，發行正式版本 `v1.0.0`。 | Antigravity |
 | `v0.1.0` | 2026-07-05 | 初始化專案，建立 `AGENTS.md`、`ANTIGRAVITY.md` 與 `PROJECT_STATUS.md`。 | Antigravity |
