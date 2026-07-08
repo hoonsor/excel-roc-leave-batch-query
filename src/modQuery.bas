@@ -10,15 +10,35 @@ Private Const COL_TEND As Integer = 5     ' 欄位 E: 結束時間
 Private Const COL_RESULT As Integer = 6   ' 欄位 F: 查詢結果
 Private Const COL_DETAIL As Integer = 7   ' 欄位 G: 請假明細
 
+' 工作表名稱常數
+Private Const WS_QUERY As String = "查詢介面"
+Private Const WS_DB As String = "差假資料庫"
+Private Const WS_STAFF As String = "教職員名單"   ' 教職員名單工作表名稱
+
+' 顏色常數
+Private Const CLR_LEAVE_BG As Long = 16765386    ' RGB(253,233,230) 淡紅 - 有請假背景
+Private Const CLR_LEAVE_FG As Long = 720972      ' RGB(220,20,60)   紅色 - 有請假文字
+Private Const CLR_WARN_BG As Long = 13434879     ' RGB(255,242,204) 橙黃 - 警告背景
+Private Const CLR_NOT_IN_STAFF As Long = 5296274 ' RGB(146,208,80)  草綠 - 不在教職員名單
+
 ''' <summary>
 ''' 執行大批請假查詢
 ''' </summary>
 Public Sub RunBatchQuery()
     Dim wsQuery As Worksheet
     Dim wsDb As Worksheet
+    Dim wsStaff As Worksheet
     
-    Set wsQuery = ThisWorkbook.Sheets("查詢介面")
-    Set wsDb = ThisWorkbook.Sheets("差假資料庫")
+    Set wsQuery = ThisWorkbook.Sheets(WS_QUERY)
+    Set wsDb = ThisWorkbook.Sheets(WS_DB)
+    
+    ' 嘗試取得「教職員名單」工作表（選用，不存在則略過比對）
+    Dim hasStaffSheet As Boolean
+    hasStaffSheet = False
+    On Error Resume Next
+    Set wsStaff = ThisWorkbook.Sheets(WS_STAFF)
+    If Not wsStaff Is Nothing Then hasStaffSheet = True
+    On Error GoTo 0
     
     ' 1. 取得查詢列數
     Dim lastRowQuery As Long
@@ -49,7 +69,26 @@ Public Sub RunBatchQuery()
         wsDb.Range("A2:L" & lastRowDb).Font.ColorIndex = xlAutomatic
     End If
     
-    ' 4. 將差假資料庫載入到記憶體中並建立字典索引 (以姓名為 Key)
+    ' 4a. 載入「教職員名單」到字典（完全一致比對，等同 VLOOKUP Exact Match）
+    Dim dictStaff As Object
+    Set dictStaff = CreateObject("Scripting.Dictionary")
+    dictStaff.CompareMode = vbBinaryCompare  ' 區分全半形與大小寫，要求完全一致
+    
+    If hasStaffSheet Then
+        Dim lastRowStaff As Long
+        lastRowStaff = wsStaff.Cells(wsStaff.Rows.Count, 1).End(xlUp).Row
+        
+        Dim rSt As Long
+        Dim staffName As String
+        For rSt = 1 To lastRowStaff
+            staffName = Trim(CStr(wsStaff.Cells(rSt, 1).Value))
+            If staffName <> "" And Not dictStaff.Exists(staffName) Then
+                dictStaff.Add staffName, True
+            End If
+        Next rSt
+    End If
+    
+    ' 4b. 將差假資料庫載入到記憶體中並建立字典索引 (以姓名為 Key)
     Dim dictDb As Object
     Set dictDb = CreateObject("Scripting.Dictionary")
     
@@ -186,7 +225,7 @@ Public Sub RunBatchQuery()
 WriteResult:
         If Not queryValid Then
             wsQuery.Cells(rQuery, COL_RESULT).Value = errMsg
-            wsQuery.Range(wsQuery.Cells(rQuery, 1), wsQuery.Cells(rQuery, COL_DETAIL)).Interior.Color = RGB(255, 242, 204) ' 橙黃色警告
+            wsQuery.Range(wsQuery.Cells(rQuery, 1), wsQuery.Cells(rQuery, COL_DETAIL)).Interior.Color = CLR_WARN_BG ' 橙黃色警告
             GoTo NextQuery
         End If
         
@@ -224,8 +263,8 @@ WriteResult:
                     End If
                     
                     ' 2) 人性化回饋：同步在「差假資料庫」對應的原始 row 上標註顏色
-                    wsDb.Range("A" & lRec.DbRow & ":L" & lRec.DbRow).Interior.Color = RGB(253, 233, 230) ' 淡紅色
-                    wsDb.Range("A" & lRec.DbRow & ":L" & lRec.DbRow).Font.Color = RGB(220, 20, 60)         ' 紅色
+                    wsDb.Range("A" & lRec.DbRow & ":L" & lRec.DbRow).Interior.Color = CLR_LEAVE_BG ' 淡紅色
+                    wsDb.Range("A" & lRec.DbRow & ":L" & lRec.DbRow).Font.Color = CLR_LEAVE_FG     ' 紅色
                 End If
             Next item
         End If
@@ -235,12 +274,26 @@ WriteResult:
             wsQuery.Cells(rQuery, COL_RESULT).Value = "有請假"
             wsQuery.Cells(rQuery, COL_DETAIL).Value = leaveDetails
             ' 淡紅色背景，紅色文字 (著色整列查詢資料)
-            wsQuery.Range(wsQuery.Cells(rQuery, 1), wsQuery.Cells(rQuery, COL_DETAIL)).Interior.Color = RGB(253, 233, 230)
-            wsQuery.Range(wsQuery.Cells(rQuery, 1), wsQuery.Cells(rQuery, COL_DETAIL)).Font.Color = RGB(220, 20, 60)
-        else
+            wsQuery.Range(wsQuery.Cells(rQuery, 1), wsQuery.Cells(rQuery, COL_DETAIL)).Interior.Color = CLR_LEAVE_BG
+            wsQuery.Range(wsQuery.Cells(rQuery, 1), wsQuery.Cells(rQuery, COL_DETAIL)).Font.Color = CLR_LEAVE_FG
+        Else
             wsQuery.Cells(rQuery, COL_RESULT).Value = "無請假"
             ' 綠色調字體
             wsQuery.Range(wsQuery.Cells(rQuery, COL_RESULT), wsQuery.Cells(rQuery, COL_RESULT)).Font.Color = RGB(34, 139, 34)
+        End If
+        
+        ' 8. 教職員名單比對：精確比對（等同 VLOOKUP Exact Match）
+        '    規則：名稱必須一模一樣（含空格差異也視為不同）
+        '    若「不存在」於名單中 → 姓名儲存格標綠色底色作為警示
+        If hasStaffSheet Then
+            ' 注意：此處不使用 Trim，刻意保留原始值做嚴格比對
+            Dim rawQueryName As String
+            rawQueryName = CStr(wsQuery.Cells(rQuery, COL_NAME).Value)
+            
+            If Not dictStaff.Exists(rawQueryName) Then
+                ' 不在教職員名單中 → 姓名欄標綠色底色（保留既有的請假顏色，僅覆寫姓名儲存格背景）
+                wsQuery.Cells(rQuery, COL_NAME).Interior.Color = CLR_NOT_IN_STAFF
+            End If
         End If
         
 NextQuery:
@@ -289,7 +342,7 @@ Public Sub ClearQueryData()
         
         Application.ScreenUpdating = False
         
-        ' 1. 清除查詢介面
+        ' 1. 清除查詢介面（含教職員名單比對後的綠色底色標記）
         wsQuery.Range("B5:G" & lastRowQuery).ClearContents
         wsQuery.Range("A5:G" & lastRowQuery).Interior.ColorIndex = xlNone
         wsQuery.Range("A5:G" & lastRowQuery).Font.ColorIndex = xlAutomatic
