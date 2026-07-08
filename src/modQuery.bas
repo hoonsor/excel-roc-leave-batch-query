@@ -302,7 +302,7 @@ NextQuery:
     ' 8. 人性化功能：若有匹配項目，在「差假資料庫」啟用背景色篩選
     If anyMatch And lastRowDb >= 2 Then
         ' Field 1 = 第 1 欄 (單位)。根據淡紅色背景色篩選，只顯示有命中的行
-        wsDb.Range("A1:L" & lastRowDb).AutoFilter Field:=1, Criteria1:=RGB(253, 233, 230), Operator:=xlFilterCellColor
+        wsDb.Range("A1:L" & lastRowDb).AutoFilter Field:=1, Criteria1:=CLR_LEAVE_BG, Operator:=xlFilterCellColor
     End If
     
     ' 9. 效能優化結束與恢復
