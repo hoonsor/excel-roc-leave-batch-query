@@ -17,8 +17,25 @@ Desktop.ini
 
 # Test data & Copies
 差假紀錄查詢_*.xls
+加班紀錄查詢_*.xls
 * - 複製.xlsm
 * - Copy.xlsm
 * - Copy.xlsx
 * - 複製.xlsx
+
+# User Directories
+001-歷史檔案（已作業完成）/
+002-待作業檔案/
+003-測試資料/
+
+# Generated copies
+[0-9]*-差假大批查詢工具.xlsm
+
+# Temporary python scratch scripts
+scratch/ocr_helper.ps1
+scratch/test_astask.ps1
+scratch/test_winsdk_ocr.py
+scratch/apply_learning.py
+scratch/test_astask.ps1
+
 
