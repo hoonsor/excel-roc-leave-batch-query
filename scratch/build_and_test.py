@@ -15,6 +15,16 @@ def enable_vba_access():
     except Exception as e:
         print("Warning: Failed to set AccessVBOM in Registry. If you get VBProject errors, please enable 'Trust access to the VBA project object model' in Excel settings manually.", e)
 
+def force_kill_excel():
+    """無論 COM 呼叫是否成功，強制終止所有 Excel.exe 進程以釋放檔案鎖定。"""
+    import subprocess
+    result = subprocess.run(
+        ["powershell", "-Command",
+         "Get-Process EXCEL -ErrorAction SilentlyContinue | Stop-Process -Force"],
+        capture_output=True, text=True
+    )
+    print("[Cleanup] All Excel processes forcibly terminated to release file lock.")
+
 def build_excel_tool():
     enable_vba_access()
     
@@ -284,16 +294,24 @@ def build_excel_tool():
         # 儲存最終乾淨狀態
         wb.Save()
 
-        
     except Exception as e:
         print("Error during build and test:", e)
         import traceback
         traceback.print_exc()
         sys.exit(1)
     finally:
-        if 'wb' in locals():
-            wb.Close(False)
-        excel.Quit()
+        # 逐步清理：每步都用 try/except 保護，避免 RPC 失敗中斷 cleanup 鏈
+        try:
+            if 'wb' in locals() and wb is not None:
+                wb.Close(False)
+        except Exception as cleanup_err:
+            print(f"[Cleanup] wb.Close() failed (safe to ignore): {cleanup_err}")
+        try:
+            excel.Quit()
+        except Exception as cleanup_err:
+            print(f"[Cleanup] excel.Quit() failed (safe to ignore): {cleanup_err}")
+        # 最終保險：強制終止所有殘留 Excel 進程，確保檔案鎖定完全釋放
+        force_kill_excel()
 
 if __name__ == "__main__":
     build_excel_tool()
