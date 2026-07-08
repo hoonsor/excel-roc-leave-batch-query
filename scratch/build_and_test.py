@@ -69,11 +69,19 @@ def build_excel_tool():
         ws_db = wb.Sheets.Add(After=ws_query)
         ws_db.Name = "差假資料庫"
         
+        # 建立第三個工作表 (教職員名單)
+        ws_staff = wb.Sheets.Add(After=ws_db)
+        ws_staff.Name = "教職員名單"
+        
         # 2. 寫入資料庫標頭列
         headers_db = ["單位", "職稱", "姓名", "假別", "差假開始日期", "差假結束日期", "共計", "事由", "地點", "課務狀況", "備註", "審核狀況"]
         for col_idx, h in enumerate(headers_db, start=1):
             ws_db.Cells(1, col_idx).Value = h
             ws_db.Cells(1, col_idx).Font.Bold = True
+            
+        # 寫入教職員名單標頭列
+        ws_staff.Cells(1, 1).Value = "姓名"
+        ws_staff.Cells(1, 1).Font.Bold = True
             
         # 3. 匯入 VBA 程式碼 (轉為 CP950 臨時檔再匯入，確保 VBE 不亂碼)
         temp_vba_dir = os.path.join(workspace_dir, "scratch", "temp_cp950")
