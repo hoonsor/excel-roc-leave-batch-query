@@ -160,4 +160,4 @@ LEARNED_DATA = {
 }
 
 # 只有在使用者確認沒問題後，IS_ENABLED 會被改為 True
-IS_ENABLED = False
+IS_ENABLED = True
