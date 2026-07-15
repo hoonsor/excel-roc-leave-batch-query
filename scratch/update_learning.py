@@ -1,6 +1,11 @@
 import os
 import json
+import sys
 from datetime import datetime
+
+# Reconfigure stdout to support unicode emojis in Windows command prompt
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 def update_lessons():
     workspace_dir = r"d:\北科附工\015-Antigravity工作資料夾\03-Antigravity協助撰寫巨集"
@@ -11,7 +16,7 @@ def update_lessons():
     metadata_path = os.path.join(kb_dir, "metadata.json")
     
     today = datetime.now().strftime("%Y-%m-%d")
-    conv_id = "cbfbfb20-dd4f-4230-a15b-90b4105a9d27"
+    conv_id = "32c05ddd-8e67-4b6f-a42c-cfad45eb41ed"
     
     # -------------------------------------------------------------
     # 1. 準備追加的四大教訓內容
