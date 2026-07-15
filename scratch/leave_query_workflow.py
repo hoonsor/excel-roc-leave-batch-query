@@ -25,8 +25,14 @@ except ImportError:
 import pypdfium2 as pdfium
 
 # ── 路徑設定 ──────────────────────────────────────────────
-SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR  = os.path.dirname(SCRIPT_DIR)
+if getattr(sys, 'frozen', False):
+    # 若為打包後的 exe 執行環境
+    PROJECT_DIR = os.path.dirname(sys.executable)
+else:
+    # 原始開發環境
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
+
 TEMPLATE     = os.path.join(PROJECT_DIR, "差假大批查詢工具.xlsm")
 PDF_INBOX    = os.path.join(PROJECT_DIR, "002-待作業檔案")
 
@@ -361,4 +367,11 @@ async def main_async():
     print("     3. 點選「2. 執行大批查詢」進行比對與著色")
 
 if __name__ == "__main__":
-    asyncio.run(main_async())
+    try:
+        asyncio.run(main_async())
+    except Exception as e:
+        print(f"\n❌ 發生未預期錯誤：{e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        input("\n請按 Enter 鍵結束並關閉視窗...")
