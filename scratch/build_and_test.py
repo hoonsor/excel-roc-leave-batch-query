@@ -208,72 +208,75 @@ def build_excel_tool():
         # 5. 開始自動化測試與驗證
         print("--- Running Automated Verification ---")
         
-        # 讀取來源
-        print("Importing test leave data directly from source XLS...")
-        wb_source = excel.Workbooks.Open(raw_xls_path, ReadOnly=True)
-        ws_source = wb_source.Sheets(1)
-        source_data = ws_source.Range("A2:L2461").Value
-        ws_db.Range("A2:L2461").Value = source_data
-        wb_source.Close(False)
-        print("Loaded leave records into database sheet.")
-        
-        # 暫時填入測試用查詢資料（僅用於自動化驗證，驗證後立即清除）
-        test_queries = [
-            ["1", "李修銘", "1150210", "0800", "0900"],
-            ["2", "李修銘", "1150210", "1700", "1800"],
-            ["3", "許夆池", "1150317", "1800", "2000"],
-            ["4", "林家繽", "1150316", "1200", "1400"],
-            ["5", "許振武", "1150130", "0800", "1200"]
-        ]
-        for r_idx, row_data in enumerate(test_queries, start=5):
-            for c_idx, val in enumerate(row_data, start=1):
-                ws_query.Cells(r_idx, c_idx).Value = val
-        
-        # 執行大批查詢巨集
-        print("Running batch query macro (RunBatchQuery)...")
-        excel.Run("RunBatchQuery")
-        
-        # 讀取查詢結果進行斷言驗證
-        results = []
-        for r_idx in range(5, 5 + len(test_queries)):
-            res_val = ws_query.Cells(r_idx, 6).Value
-            det_val = ws_query.Cells(r_idx, 7).Value
-            results.append((ws_query.Cells(r_idx, 2).Value, res_val, det_val))
+        if os.path.exists(raw_xls_path):
+            # 讀取來源
+            print("Importing test leave data directly from source XLS...")
+            wb_source = excel.Workbooks.Open(raw_xls_path, ReadOnly=True)
+            ws_source = wb_source.Sheets(1)
+            source_data = ws_source.Range("A2:L2461").Value
+            ws_db.Range("A2:L2461").Value = source_data
+            wb_source.Close(False)
+            print("Loaded leave records into database sheet.")
             
-        print("\n=== VERIFICATION RESULTS ===")
-        for name, status, detail in results:
-            print(f"Name: {name} | Result: {status} | Detail: {detail[:60] if detail else ''}")
+            # 暫時填入測試用查詢資料（僅用於自動化驗證，驗證後立即清除）
+            test_queries = [
+                ["1", "李修銘", "1150210", "0800", "0900"],
+                ["2", "李修銘", "1150210", "1700", "1800"],
+                ["3", "許夆池", "1150317", "1800", "2000"],
+                ["4", "林家繽", "1150316", "1200", "1400"],
+                ["5", "許振武", "1150130", "0800", "1200"]
+            ]
+            for r_idx, row_data in enumerate(test_queries, start=5):
+                for c_idx, val in enumerate(row_data, start=1):
+                    ws_query.Cells(r_idx, c_idx).Value = val
             
-        # 斷言驗證
-        assert results[0][1] == "Band 1" or results[0][1] == "有請假", "Verification failed"
-        
-        print("\nAll automated integration tests PASSED successfully!")
-        
-        # ✅ 驗證完成後，清除查詢介面及臨時假單資料
-        print("Clearing test data for delivery...")
-        last_row = 5 + len(test_queries) - 1
-        ws_query.Range(f"A5:G{last_row}").ClearContents()
-        ws_query.Range(f"A5:G{last_row}").Interior.ColorIndex = -4142
-        ws_query.Range(f"A5:G{last_row}").Font.ColorIndex = -4105
-        
-        if ws_db.AutoFilterMode:
-            ws_db.AutoFilterMode = False
-        ws_db.Range("A2:L2461").Interior.ColorIndex = -4142
-        ws_db.Range("A2:L2461").Font.ColorIndex = -4105
-        ws_db.Range("A2:L2461").ClearContents()
-        
-        placeholder_rows = [
-            ["1", "", "1150210", "0800", "0900"],
-            ["2", "", "1150315", "1300", "1700"],
-            ["3", "", "1150101", "0800", "1700"],
-            ["4", "", "", "", ""],
-            ["5", "", "", "", ""],
-        ]
-        for r_idx, row_data in enumerate(placeholder_rows, start=5):
-            for c_idx, val in enumerate(row_data, start=1):
-                ws_query.Cells(r_idx, c_idx).Value = val
-        print("Test data cleared successfully.")
-        
+            # 執行大批查詢巨集
+            print("Running batch query macro (RunBatchQuery)...")
+            excel.Run("RunBatchQuery")
+            
+            # 讀取查詢結果進行斷言驗證
+            results = []
+            for r_idx in range(5, 5 + len(test_queries)):
+                res_val = ws_query.Cells(r_idx, 6).Value
+                det_val = ws_query.Cells(r_idx, 7).Value
+                results.append((ws_query.Cells(r_idx, 2).Value, res_val, det_val))
+                
+            print("\n=== VERIFICATION RESULTS ===")
+            for name, status, detail in results:
+                print(f"Name: {name} | Result: {status} | Detail: {detail[:60] if detail else ''}")
+                
+            # 斷言驗證
+            assert results[0][1] == "Band 1" or results[0][1] == "有請假", "Verification failed"
+            
+            print("\nAll automated integration tests PASSED successfully!")
+            
+            # ✅ 驗證完成後，清除查詢介面及臨時假單資料
+            print("Clearing test data for delivery...")
+            last_row = 5 + len(test_queries) - 1
+            ws_query.Range(f"A5:G{last_row}").ClearContents()
+            ws_query.Range(f"A5:G{last_row}").Interior.ColorIndex = -4142
+            ws_query.Range(f"A5:G{last_row}").Font.ColorIndex = -4105
+            
+            if ws_db.AutoFilterMode:
+                ws_db.AutoFilterMode = False
+            ws_db.Range("A2:L2461").Interior.ColorIndex = -4142
+            ws_db.Range("A2:L2461").Font.ColorIndex = -4105
+            ws_db.Range("A2:L2461").ClearContents()
+            
+            placeholder_rows = [
+                ["1", "", "1150210", "0800", "0900"],
+                ["2", "", "1150315", "1300", "1700"],
+                ["3", "", "1150101", "0800", "1700"],
+                ["4", "", "", "", ""],
+                ["5", "", "", "", ""],
+            ]
+            for r_idx, row_data in enumerate(placeholder_rows, start=5):
+                for c_idx, val in enumerate(row_data, start=1):
+                    ws_query.Cells(r_idx, c_idx).Value = val
+            print("Test data cleared successfully.")
+        else:
+            print(f"Warning: Raw test XLS file not found at '{raw_xls_path}'. Skipping integration verification.")
+            
         wb.Save()
         
     except Exception as e:

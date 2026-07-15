@@ -110,6 +110,9 @@ NextRow:
     ' 6. 關閉來源活頁簿
     wbSource.Close SaveChanges:=False
     
+    ' 寫入匯入檔案名稱到 M1 儲存格
+    wsDest.Range("M1").Value = Dir(fileSelected)
+    
     ' 7. 效能優化結束與恢復
     Application.ScreenUpdating = True
     Application.Calculation = xlCalculationAutomatic
