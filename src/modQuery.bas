@@ -108,7 +108,7 @@ Public Sub RunBatchQuery()
                 Dim strStatus As String
                 strStatus = Trim(CStr(arrDb(rDb, 12))) ' 審核狀況 (第 12 欄)
                 
-                If strStatus = "已簽核" Or strStatus = "審核完成" Or strStatus = "" Then
+                If strStatus = "已簽核" Or strStatus = "審核完成" Or strStatus = "送審中" Or strStatus = "" Then
                     ' 實例化類別物件
                     Set rec = New clsLeaveRecord
                     rec.Status = strStatus
