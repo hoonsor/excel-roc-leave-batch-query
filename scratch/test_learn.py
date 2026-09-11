@@ -15,8 +15,11 @@ except ImportError as e:
     print(f"Error: Cannot import rules from {rules_dir}: {e}")
     exit(1)
 
-# Step 1: Copy Excel file with 1150909 prefix
-roc_prefix = "1150909"
+# Step 1: Copy Excel file with today's ROC prefix
+from datetime import datetime
+now = datetime.now()
+roc_year = now.year - 1911
+roc_prefix = f"{roc_year}{now.month:02d}{now.day:02d}"
 template_file = os.path.join(base_dir, "差假大批查詢工具.xlsm")
 dest_file = os.path.join(base_dir, f"{roc_prefix}-測試學習-差假大批查詢工具.xlsm")
 

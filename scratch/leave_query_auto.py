@@ -16,8 +16,9 @@ except ImportError:
     roc_pdf_rules = None
 
 # Step 1: Get today's ROC date
-# Local time is 2026-07-15 -> ROC 1150715
-roc_prefix = "1150715"
+now = datetime.now()
+roc_year = now.year - 1911
+roc_prefix = f"{roc_year}{now.month:02d}{now.day:02d}"
 template_file = os.path.join(base_dir, "差假大批查詢工具.xlsm")
 dest_file = os.path.join(base_dir, f"{roc_prefix}-差假大批查詢工具.xlsm")
 
