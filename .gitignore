@@ -27,9 +27,18 @@ Desktop.ini
 001-歷史檔案（已作業完成）/
 002-待作業檔案/
 003-測試資料/
+004-系統匯出之差假紀錄/
+backups/
+dist/
+__pycache__/
+*.pyc
 
 # Generated copies
 [0-9]*-差假大批查詢工具.xlsm
+[0-9]*-測試學習-差假大批查詢工具.xlsm
+temp.png
+temp.txt
+pdf_output.txt
 
 # Temporary python scratch scripts
 scratch/ocr_helper.ps1

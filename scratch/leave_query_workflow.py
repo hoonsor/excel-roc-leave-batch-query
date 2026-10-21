@@ -85,7 +85,32 @@ async def ocr_page_async(png_path: str) -> str:
         engine = OcrEngine.try_create_from_user_profile_languages()
         
     result = await engine.recognize_async(software_bitmap)
-    return result.text
+    lines_info = []
+    for line in result.lines:
+        if line.words:
+            y = sum(w.bounding_rect.y for w in line.words) / len(line.words)
+            x = line.words[0].bounding_rect.x
+            lines_info.append({'text': line.text, 'y': y, 'x': x})
+            
+    lines_info.sort(key=lambda item: item['y'])
+    rows = []
+    current_row = []
+    current_y = None
+    for item in lines_info:
+        if current_y is None or abs(item['y'] - current_y) < 20:
+            current_row.append(item)
+            current_y = item['y'] if current_y is None else (current_y + item['y'])/2
+        else:
+            current_row.sort(key=lambda item: item['x'])
+            rows.append(''.join(i['text'] for i in current_row))
+            current_row = [item]
+            current_y = item['y']
+            
+    if current_row:
+        current_row.sort(key=lambda item: item['x'])
+        rows.append(''.join(i['text'] for i in current_row))
+        
+    return '\n'.join(rows)
 
 async def ocr_pdf_file_async(pdf_path: str) -> str:
     doc = pdfium.PdfDocument(pdf_path)
@@ -136,7 +161,61 @@ def parse_extracted_data(text: str, filename: str, staff_names: list[str]) -> li
             break
             
     # 3. 根據文件類型執行特定解析
-    # 類型 A: 職場巡輔交通費申請表 (格式多為 3/12、4/2、5/21)
+    # 類型 A: 橫式清冊 (具備年份、月份，如 115年丙級專案... 一月份)
+    m_yr = re.search(r'(\d{2,3})年', normalized)
+    m_mo = re.search(r'([一二三四五六七八九十]+|\d{1,2})月份', normalized)
+    if m_yr and m_mo:
+        print(f"  ℹ️  使用橫式清冊(日期逗號分隔)策略...")
+        yr = int(m_yr.group(1))
+        mo_str = m_mo.group(1)
+        chinese_num = {'一':1, '二':2, '三':3, '四':4, '五':5, '六':6, '七':7, '八':8, '九':9, '十':10, '十一':11, '十二':12}
+        mo = chinese_num.get(mo_str) or int(mo_str)
+        
+        lines = normalized.splitlines()
+        for i, line in enumerate(lines):
+            matched_staff = next((s for s in staff_names if s in line), None)
+            if matched_staff:
+                combined_line = line
+                if i + 1 < len(lines) and re.match(r'^[0-9,上下]+$', lines[i+1]):
+                    combined_line += lines[i+1]
+                
+                if '匯款' in combined_line:
+                    date_part = combined_line.split('匯款')[-1]
+                else:
+                    m_seq = re.search(r'([0-9,上下]+)$', combined_line)
+                    date_part = m_seq.group(1) if m_seq else ''
+                    
+                valid_dates = re.findall(r'(?<!\d)([1-9]|[12]\d|3[01])([上下]?)(?!\d)', date_part)
+                for d, part in valid_dates:
+                    roc_date = f'{yr:03d}{mo:02d}{int(d):02d}'
+                    start, end = '0800', '1700'
+                    if part == '上': end = '1200'
+                    elif part == '下': start = '1300'
+                    rows.append({'name': matched_staff, 'date_roc': f"'{roc_date}", 'start': f"'{start}", 'end': f"'{end}"})
+                    
+        if rows:
+            print(f"  📅 橫式清冊：共提取出 {len(rows)} 筆查詢時段")
+            return rows
+
+    # 類型 A2: 全國技能檢定術科工作人員清冊 (具備年份，日期為 9/22(全)、10/06(全) 格式)
+    if m_yr and re.search(r'\d{1,2}/\d{1,2}\([全上下]', normalized):
+        print(f"  ℹ️  使用全國檢定清冊(MM/DD(全/上/下))策略...")
+        yr = int(m_yr.group(1))
+        for line in normalized.splitlines():
+            matched_staff = next((s for s in staff_names if s in line), None)
+            if matched_staff:
+                for m_d in re.finditer(r'(\d{1,2})/(\d{1,2})\((全|上|下|上午|下午)\)', line):
+                    mo, d, part = int(m_d.group(1)), int(m_d.group(2)), m_d.group(3)
+                    roc_date = f'{yr:03d}{mo:02d}{d:02d}'
+                    start, end = '0800', '1700'
+                    if part in ('上', '上午'): end = '1200'
+                    elif part in ('下', '下午'): start = '1300'
+                    rows.append({'name': matched_staff, 'date_roc': f"'{roc_date}", 'start': f"'{start}", 'end': f"'{end}"})
+        if rows:
+            print(f"  📅 全國檢定清冊：共提取出 {len(rows)} 筆查詢時段")
+            return rows
+
+    # 類型 B: 職場巡輔交通費申請表 (格式多為 3/12、4/2、5/21)
     if "職場巡輔" in normalized or "巡輔" in normalized or "交通費" in normalized:
         if not name:
             for staff in staff_names:
@@ -169,8 +248,8 @@ def parse_extracted_data(text: str, filename: str, staff_names: list[str]) -> li
                     
                     if roc_date not in seen_dates:
                         seen_dates.add(roc_date)
-                        rows.append({"name": name, "date_roc": roc_date, "start": "0800", "end": "1200"})
-                        rows.append({"name": name, "date_roc": roc_date, "start": "1300", "end": "1700"})
+                        rows.append({"name": name, "date_roc": f"'{roc_date}", "start": "'0800", "end": "1200"})
+                        rows.append({"name": name, "date_roc": f"'{roc_date}", "start": "1300", "end": "1700"})
                 except Exception:
                     pass
                     
@@ -199,7 +278,7 @@ def parse_extracted_data(text: str, filename: str, staff_names: list[str]) -> li
                     roc_date = f"{y:03d}{mo:02d}{d:02d}"
                     if roc_date not in seen_dates:
                         seen_dates.add(roc_date)
-                        rows.append({"name": name, "date_roc": roc_date, "start": "0800", "end": "1500"})
+                        rows.append({"name": name, "date_roc": f"'{roc_date}", "start": "'0800", "end": "'1500"})
                         print(f"  👤 匹配教師：{name} (唯一教師) | 📅 授課日期：{roc_date} (預設 0800 ~ 1500)")
                 except Exception:
                     pass
@@ -222,7 +301,7 @@ def parse_extracted_data(text: str, filename: str, staff_names: list[str]) -> li
                                 break
                                 
                         if matched_teacher:
-                            rows.append({"name": matched_teacher, "date_roc": roc_date, "start": "0800", "end": "1500"})
+                            rows.append({"name": matched_teacher, "date_roc": f"'{roc_date}", "start": "'0800", "end": "'1500"})
                             print(f"  👤 匹配教師：{matched_teacher} | 📅 授課日期：{roc_date} (預設 0800 ~ 1500)")
                     except Exception:
                         pass
@@ -374,4 +453,4 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
     finally:
-        input("\n請按 Enter 鍵結束並關閉視窗...")
+        print("\n✅ 任務結束")

@@ -8,7 +8,19 @@ Public Sub ImportLeaveData()
     Dim fd As Object
     Dim fileSelected As String
     
-    ' 1. 彈出檔案選取對話框
+    ' 1. 彈出檔案選取對話框 (預設開啟「004-系統匯出之差假紀錄」或目前工作簿資料夾)
+    Dim defaultDir As String
+    defaultDir = ThisWorkbook.Path & "\004-系統匯出之差假紀錄"
+    On Error Resume Next
+    If Dir(defaultDir, vbDirectory) <> "" Then
+        ChDrive Left(defaultDir, 1)
+        ChDir defaultDir
+    Else
+        ChDrive Left(ThisWorkbook.Path, 1)
+        ChDir ThisWorkbook.Path
+    End If
+    On Error GoTo 0
+    
     fileSelected = Application.GetOpenFilename("Excel Files (*.xls; *.xlsx; *.xlsm), *.xls; *.xlsx; *.xlsm", , "請選取差勤系統匯出的請假明細檔")
     
     If fileSelected = "False" Then
@@ -29,11 +41,17 @@ Public Sub ImportLeaveData()
     ' 3. 設定目標工作表 (在本活頁簿中)
     Set wsDest = ThisWorkbook.Sheets("差假資料庫")
     
-    ' 清除目標工作表的舊資料 (保留第一行標頭)
+    ' 預先清除資料庫的篩選狀態與舊有著色，避免清除不完全
+    If wsDest.FilterMode Then wsDest.ShowAllData
+    If wsDest.AutoFilterMode Then wsDest.AutoFilterMode = False
+    
+    ' 清除目標工作表的舊資料與色彩 (保留第一行標頭)
     Dim lastRowDest As Long
     lastRowDest = wsDest.Cells(wsDest.Rows.Count, "A").End(xlUp).Row
     If lastRowDest > 1 Then
         wsDest.Range("A2:L" & lastRowDest).ClearContents
+        wsDest.Range("A2:L" & lastRowDest).Interior.ColorIndex = xlNone
+        wsDest.Range("A2:L" & lastRowDest).Font.ColorIndex = xlAutomatic
     End If
     
     ' 4. 開啟來源活頁簿 (唯讀)
@@ -110,8 +128,13 @@ NextRow:
     ' 6. 關閉來源活頁簿
     wbSource.Close SaveChanges:=False
     
-    ' 寫入匯入檔案名稱到 M1 儲存格
-    wsDest.Range("M1").Value = Dir(fileSelected)
+    ' 寫入匯入檔案名稱到差假資料庫 M1 儲存格，並同步顯示於查詢介面 H3 儲存格
+    Dim importedFileName As String
+    importedFileName = Dir(fileSelected)
+    wsDest.Range("M1").Value = importedFileName
+    On Error Resume Next
+    ThisWorkbook.Sheets("查詢介面").Range("F3").Value = "目前資料庫：" & importedFileName & " (" & (destRow - 2) & " 筆)"
+    On Error GoTo ErrorHandler
     
     ' 7. 效能優化結束與恢復
     Application.ScreenUpdating = True
