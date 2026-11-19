@@ -311,8 +311,98 @@ def parse_extracted_data(text: str, filename: str, staff_names: list[str]) -> li
             
     return rows
 
+# ── 尋找最新差假紀錄查詢檔案 ─────────────────────────────────────
+def get_latest_leave_file(project_dir: str):
+    import glob
+    candidates = []
+    search_dirs = [project_dir, os.path.join(project_dir, "004-系統匯出之差假紀錄")]
+    for sdir in search_dirs:
+        if os.path.exists(sdir):
+            for ext in ("*.xls", "*.xlsx", "*.xlsm"):
+                for fpath in glob.glob(os.path.join(sdir, f"差假紀錄查詢_{ext}")):
+                    fname = os.path.basename(fpath)
+                    m = re.search(r"差假紀錄查詢_(\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})", fname)
+                    date_key = m.group(1) if m else ""
+                    mtime = os.path.getmtime(fpath)
+                    candidates.append((date_key, mtime, fpath))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    return candidates[0][2]
+
+def import_leave_records(excel, wb_dest, leave_file_path: str) -> int:
+    print(f"
+📥 正在自動匯入最新差假紀錄：{os.path.basename(leave_file_path)}...")
+    wb_src = excel.Workbooks.Open(leave_file_path, ReadOnly=True)
+    try:
+        ws_src = wb_src.Sheets(1)
+        last_row_src = ws_src.Cells(ws_src.Rows.Count, 1).End(-4162).Row
+        if last_row_src < 2:
+            print("  ⚠️ 差假紀錄檔案中無資料列")
+            return 0
+        raw_data = ws_src.Range(f"A2:L{last_row_src}").Value
+    finally:
+        wb_src.Close(False)
+
+    valid_rows = []
+    for r in raw_data:
+        cell_a = str(r[0] or "").strip()
+        cell_c = str(r[2] or "").strip()
+        cell_e = str(r[4] or "").strip()
+        if cell_a.startswith("■") or "■" in cell_a or "共計" in cell_a:
+            continue
+        if not cell_a and not cell_c and not cell_e:
+            continue
+        valid_rows.append(r)
+
+    ws_db = wb_dest.Sheets("差假資料庫")
+    ws_query = wb_dest.Sheets("查詢介面")
+
+    if ws_db.FilterMode:
+        ws_db.ShowAllData()
+    if ws_db.AutoFilterMode:
+        ws_db.AutoFilterMode = False
+
+    last_row_dest = ws_db.Cells(ws_db.Rows.Count, 1).End(-4162).Row
+    if last_row_dest > 1:
+        ws_db.Range(f"A2:L{last_row_dest}").ClearContents()
+        ws_db.Range(f"A2:L{last_row_dest}").Interior.ColorIndex = -4142
+        ws_db.Range(f"A2:L{last_row_dest}").Font.ColorIndex = -4105
+
+    if valid_rows:
+        dest_range = ws_db.Range(ws_db.Cells(2, 1), ws_db.Cells(1 + len(valid_rows), 12))
+        dest_range.Value = valid_rows
+
+    fname = os.path.basename(leave_file_path)
+    ws_db.Range("M1").Value = fname
+    ws_query.Range("F3").Value = f"目前資料庫：{fname} ({len(valid_rows)} 筆)"
+    ws_query.Range("F3").Font.Name = "微軟正黑體"
+    ws_query.Range("F3").Font.Size = 10
+    ws_query.Range("F3").Font.Color = 0x794E1F
+    ws_query.Range("F3").Font.Bold = True
+
+    print(f"✅ 成功匯入 {len(valid_rows)} 筆差假紀錄到「差假資料庫」！")
+    return len(valid_rows)
+
 # ── Excel 寫入 ────────────────────────────────────────────
-def write_to_excel(xlsm_path: str, rows: list[dict]):
+def write_to_excel(xlsm_path: str, rows: list[dict], leave_file_path: str = None) -> int:
+    import win32com.client
+    
+    excel = win32com.client.Dispatch("Excel.Application")
+    excel.Visible = False
+    excel.DisplayAlerts = False
+    imported_count = 0
+    
+    try:
+        wb = excel.Workbooks.Open(xlsm_path)
+        
+        # 1. 若有指定最新差假紀錄檔案，先行自動匯入差假資料庫
+        if leave_file_path and os.path.exists(leave_file_path):
+            imported_count = import_leave_records(excel, wb, leave_file_path)
+        
+        print(f"
+✍️ 正在將 PDF 查詢時段寫入 Excel 查詢介面...")
+        ws_query = wb.Sheets("查詢介面")
     import win32com.client
     
     excel = win32com.client.Dispatch("Excel.Application")
@@ -430,20 +520,33 @@ async def main_async():
     print(f"\n📊 統計：共從 {len(pdf_files)} 個 PDF 中提取出 {len(all_rows)} 筆查詢時段")
     
     # 5. 寫入複製的 Excel 檔案中
-    write_to_excel(dest_path, all_rows)
+    # 5. 自動尋找目錄下最新之差假紀錄檔
+    latest_leave_file = get_latest_leave_file(PROJECT_DIR)
+    if latest_leave_file:
+        print(f"\n📂 找到最新差假紀錄檔：{os.path.basename(latest_leave_file)}")
+    else:
+        print("\n⚠️ 未在目錄下找到差假紀錄查詢檔案，將保留範本既有之資料庫。")
+        
+    # 6. 寫入複製的 Excel 檔案中 (同時自動匯入差假紀錄與寫入查詢資料)
+    imported_count = write_to_excel(dest_path, all_rows, latest_leave_file)
     
     print("\n" + "=" * 60)
     print("  🎉 #請假查詢 任務已完成！")
     print("=" * 60)
     print(f"\n  📁 今日工作檔案：{dest_name}")
+    if latest_leave_file:
+        print(f"  📥 已自動匯入差假紀錄：{os.path.basename(latest_leave_file)} (共 {imported_count} 筆)")
     print(f"  📄 已辨識 PDF 數：{len(pdf_files)} 個")
     print(f"  📝 填入查詢筆數：{len(all_rows)} 筆")
     print("\n  💡 教職員名單保護：")
     print("     您的「教職員名單」工作表完全完好如初，絕無任何刪除或修改。")
     print("\n  ➡️  後續操作：")
     print("     1. 請開啟檔案")
-    print("     2. 點選「1. 匯入請假明細」匯入差勤 XLS 檔")
-    print("     3. 點選「2. 執行大批查詢」進行比對與著色")
+    if latest_leave_file:
+        print("     2. 系統已自動幫您匯入最新差假紀錄，您只需直接點選「2. 執行大批查詢」即可開始比對！")
+    else:
+        print("     2. 點選「1. 匯入請假紀錄檔」匯入差勤 XLS 檔")
+        print("     3. 點選「2. 執行大批查詢」進行比對與著色")
 
 if __name__ == "__main__":
     try:
